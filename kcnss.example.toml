@@ -1,0 +1,6 @@
+username = "nss"
+password = "your-password"
+base_url = "https://keycloak.example.com"
+realm = "school"
+client_id = "nss"
+group_id = "ed35e3db-1145-5541-a08f-e250adf058ab"
