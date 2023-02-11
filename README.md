@@ -2,9 +2,21 @@
 
 Work in progress
 
+## Keycloak Configuration
+
+In your realm (e.g. `school`), create a client (e.g. `nss`). Create a user which is used to sending API queries to keycloak. Assign it with the following roles:
+
+- (realm-management) query-groups
+- (realm-management) query-users
+- (realm-management) view-users
+
+Create a group. Put the users that you want nss to list to this group. Each user in this group should be given the following attribtues:
+- `github_id` is the GitHub user id used to retrive public key (not used now).
+- `uid` is the uid and gid that nss with assign to.
+
 ## Usage
 
-Put the config file in `/etc/kcnss.toml` (which can be specified via `KEYCLOAK_NSS_CONF` environment variable). Note that specifying via env may bring security issues, to be audited later.
+Put the config file in `/etc/kcnss.toml`. The path to this file can be specified via `KEYCLOAK_NSS_CONF` environment variable. But specifying via env may bring security issues, so this feature will be audited later.
 
 ```toml
 username = "nss"
@@ -24,4 +36,6 @@ shadow: keycloak files systemd
 ```
 
 Put compiled `libnss_keycloak.so` in `/lib/libnss_keycloak.so.2`.
+
+Now the nss module should be setup. Try it with `getent passwd`.
 
