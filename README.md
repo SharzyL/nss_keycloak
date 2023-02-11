@@ -1,4 +1,4 @@
-# NSS module using keycloak
+# NSS Module for Keycloak
 
 Work in progress
 
@@ -14,7 +14,7 @@ Create a group. Put the users that you want nss to list to this group. Each user
 - `github_id` is the GitHub user id used to retrive public key (not used now).
 - `uid` is the uid and gid that nss with assign to.
 
-## Usage
+## Module Setup
 
 Put the config file in `/etc/kcnss.toml`. The path to this file can be specified via `KEYCLOAK_NSS_CONF` environment variable. But specifying via env may bring security issues, so this feature will be audited later.
 
@@ -35,7 +35,7 @@ group: keycloak files [SUCCESS=merge] systemd
 shadow: keycloak files systemd
 ```
 
-Put compiled `libnss_keycloak.so` in `/lib/libnss_keycloak.so.2`.
+Compile the module with `nix build` or `cargo build --release`. Put the compiled `libnss_keycloak.so` in `/lib/libnss_keycloak.so.2`.
 
 Now the nss module should be setup. Try it with `getent passwd`.
 
