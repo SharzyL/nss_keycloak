@@ -4,6 +4,7 @@ use std::io::Read;
 use std::sync::Mutex;
 
 use lazy_static::lazy_static;
+use log::error;
 use serde::Deserialize;
 
 #[derive(Deserialize)]
@@ -14,31 +15,38 @@ pub(crate) struct Config {
     pub realm: String,
     pub client_id: String,
     pub group_id: String,
+    pub default_shell: String,
 }
 
 lazy_static! {
-    pub(crate) static ref CONFIG: Mutex<Config> = Mutex::new(init_config());
+    pub(crate) static ref CONFIG: Mutex<Option<Config>> = Mutex::new(init_config());
 }
 
-fn init_config() -> Config {
+fn init_config() -> Option<Config> {
+    let _ = env_logger::builder().is_test(false).try_init();
+
     let conf_file_path = env::var_os("KEYCLOAK_NSS_CONF")
         .map(|s| String::from(s.to_str().expect("invalid unicode for env[KEYCLOAK_NSS_CONF]")))
-        .unwrap_or("kcnss.toml".to_string());
+        .unwrap_or("/etc/kcnss.toml".to_string());
 
-    let mut conf_file = File::open(&conf_file_path)
-        .map_err(|e| panic!("failed to open file '{}' from '{}': {:?}",
-                             &conf_file_path,
+    read_config(&conf_file_path)
+}
+
+pub(crate) fn read_config(config_file_path: &str) -> Option<Config> {
+    let mut conf_file = File::open(config_file_path)
+        .map_err(|e| error!("failed to open file '{}' from '{}': {:?}",
+                             &config_file_path,
                              env::current_dir().unwrap().to_str().unwrap(), e)
-        )
-        .unwrap();
+        ).ok()?;
+
 
     let mut buffer = String::new();
     conf_file.read_to_string(&mut buffer)
-        .map_err(|e| panic!("failed to read file '{}' as string: {:?}", &conf_file_path, e))
-        .unwrap()
+        .map_err(|e| error!("failed to read file '{}' as string: {:?}", &config_file_path, e))
+        .ok()?
     ;
 
-    return toml::from_str::<Config>(&buffer)
-        .map_err(|e| panic!("failed to parse '{conf_file_path}': {:?}", e))
-        .unwrap();
+    toml::from_str::<Config>(&buffer)
+        .map_err(|e| error!("failed to parse '{}': {:?}", config_file_path, e))
+        .ok()
 }

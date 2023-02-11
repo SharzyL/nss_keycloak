@@ -4,11 +4,12 @@ use chrono::{DateTime, Utc, Duration};
 use log::{info};
 use mut_static::MutStatic;
 use lazy_static::lazy_static;
+use libc::uid_t;
 
 use serde::Deserialize;
 
 use crate::err::KeycloakError;
-use crate::config::CONFIG;
+use crate::config::{Config};
 
 #[derive(Clone)]
 pub(crate) struct KeycloakCredentials {
@@ -30,8 +31,7 @@ struct TokenResponse {
     refresh_expires_in: i64,
 }
 
-pub(crate) fn request_token() -> Result<KeycloakCredentials, KeycloakError> {
-    let conf = &CONFIG.lock().unwrap();
+pub(crate) fn request_token(conf: &Config) -> Result<KeycloakCredentials, KeycloakError> {
     let base_url = conf.base_url.to_owned();
     let client_id = conf.client_id.to_owned();
     let realm = conf.realm.to_owned();
@@ -69,8 +69,7 @@ pub(crate) fn request_token() -> Result<KeycloakCredentials, KeycloakError> {
     })
 }
 
-pub(crate) fn do_refresh_token(cred: &KeycloakCredentials) -> Result<KeycloakCredentials, KeycloakError> {
-    let conf = &CONFIG.lock().unwrap();
+pub(crate) fn do_refresh_token(cred: &KeycloakCredentials, conf: &Config) -> Result<KeycloakCredentials, KeycloakError> {
     let base_url = conf.base_url.to_owned();
     let realm = conf.realm.to_owned();
     let client_id = conf.client_id.to_owned();
@@ -104,19 +103,19 @@ pub(crate) fn do_refresh_token(cred: &KeycloakCredentials) -> Result<KeycloakCre
     })
 }
 
-fn ensure_cred(option_cred: &mut Option<KeycloakCredentials>) -> Result<KeycloakCredentials, KeycloakError> {
+fn ensure_cred(option_cred: &mut Option<KeycloakCredentials>, conf: &Config) -> Result<KeycloakCredentials, KeycloakError> {
     match option_cred {
         None => {
-            request_token()
+            request_token(conf)
         }
         Some(cred) => {
             let now: DateTime<Utc> = SystemTime::now().into();
             if now < cred.access_token_expire - Duration::seconds(5) {
                 Ok(cred.to_owned())
             } else if now < cred.refresh_token_expire - Duration::seconds(5) {
-                do_refresh_token(cred)
+                do_refresh_token(cred, conf)
             } else {
-                request_token()
+                request_token(conf)
             }
         }
     }
@@ -124,11 +123,11 @@ fn ensure_cred(option_cred: &mut Option<KeycloakCredentials>) -> Result<Keycloak
 
 pub(crate) struct User {
     pub name: String,
-    pub uid: i16,
+    pub uid: uid_t,
     pub github_id: String,
 }
 
-pub(crate) fn list_users() -> Result<Vec<User>, KeycloakError> {
+pub(crate) fn list_users(conf: &Config) -> Result<Vec<User>, KeycloakError> {
     #[derive(Deserialize, Clone, Default)]
     struct GroupMemberAttributes {
         uid: Option<Vec<String>>,
@@ -143,16 +142,15 @@ pub(crate) fn list_users() -> Result<Vec<User>, KeycloakError> {
         attributes: GroupMemberAttributes,
     }
 
+    let base_url = &conf.base_url;
+    let realm = &conf.realm;
+    let group_id = &conf.group_id;
+
     let mut cred_guard = CRED.write().unwrap();
-    let cred = ensure_cred(&mut cred_guard)?;
+    let cred = ensure_cred(&mut cred_guard, &conf)?;
     let access_token = cred.access_token.to_owned();
     *cred_guard = Some(cred);
     drop(cred_guard);  // no longer need it, release the lock
-
-    let conf = &CONFIG.lock().unwrap();
-    let base_url = conf.base_url.to_owned();
-    let realm = conf.realm.to_owned();
-    let group_id = conf.group_id.to_owned();
 
     let client = reqwest::blocking::Client::new();
 
@@ -189,7 +187,7 @@ pub(crate) fn list_users() -> Result<Vec<User>, KeycloakError> {
             name: member.username.clone(),
             uid: get_attr(&attributes.uid, "uid", member_name)
                 .and_then(|s|
-                    s.parse::<i16>().map_err(
+                    s.parse::<uid_t>().map_err(
                         |e| KeycloakError::DataError(format!("unable to parse uid '{s}' as int: {e:?}"))
                     )
                 )?,

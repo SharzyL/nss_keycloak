@@ -11,7 +11,7 @@ impl Display for KeycloakError {
         match self {
             KeycloakError::RequestError(err) => write!(f, "Keycloak request error: {:?}", err),
             KeycloakError::JSONParseError(str, err) => write!(f, "Keycloak error occurs parsing `{}`: {:?}", str, err),
-            KeycloakError::DataError(err) => write!(f, "Keycloak data error: {:?}", err)
+            KeycloakError::DataError(err) => write!(f, "Keycloak data error: {:?}", err),
         }
     }
 }
